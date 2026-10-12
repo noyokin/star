@@ -8,7 +8,7 @@ from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, FSInputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from cryptography.fernet import Fernet
 
 # Загрузка переменных окружения
@@ -16,9 +16,12 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 
-# Настройка шифрования (AES 128-bit)
-KEY_FILE = "secret.key"
-ENCRYPTED_EXCEL = "students_encrypted.dat"
+# Создаем папку data, если её нет
+os.makedirs("data", exist_ok=True)
+
+# Настройка шифрования
+KEY_FILE = "data/secret.key"
+ENCRYPTED_EXCEL = "data/students_encrypted.dat"
 
 def get_or_create_key():
     if not os.path.exists(KEY_FILE):
@@ -90,7 +93,7 @@ async def check_password(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "📁 Загрузить список (Excel)", StarostaState.main_menu)
 async def request_excel(message: types.Message):
-    await message.answer("Отправьте мне файл Excel (.xlsx).\nВ файле должен быть столбец с названием **ФИО**.")
+    await message.answer("Отправьте мне файл Excel (.xlsx).\nВ файле должна быть первая строка с заголовком **ФИО**.")
 
 @dp.message(F.document, StarostaState.main_menu)
 async def handle_document(message: types.Message, bot: Bot):
@@ -115,7 +118,7 @@ async def start_attendance(message: types.Message, state: FSMContext):
         await message.answer("❌ Сначала загрузите список студентов (Excel файл).")
         return
 
-    temp_file = "temp.xlsx"
+    temp_file = "data/temp.xlsx"
     with open(temp_file, "wb") as f:
         f.write(data)
     
@@ -201,12 +204,11 @@ async def generate_and_send_report(message: types.Message, data: dict, state: FS
     if present:
         report_text += "✅ **Присутствующие:**\n" + "\n".join([f"— {s}" for s in present])
         
-    # Отправка отчета только в личный чат с ботом
     await message.answer("✅ Перекличка завершена!\n\n" + report_text, parse_mode="Markdown")
     await state.set_state(StarostaState.main_menu)
 
 async def main():
-    print("Бот для старосты запущен...")
+    print("Бот запущен...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
