@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  starosta_bot:
+    build: .
+    container_name: starosta_bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      # Сохраняем папку data на сервере, чтобы список студентов не удалялся при перезапуске
+      - ./data:/app/data
