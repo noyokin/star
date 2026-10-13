@@ -441,4 +441,58 @@ async def manage_statuses_start(message: types.Message):
     await message.answer("Какую категорию открыть?", reply_markup=kb)
 
 @dp.callback_query(F.data == "back_to_filters", StarostaState.main_menu)
-async def back_to_filters(callback: types.CallbackQuery
+async def back_to_filters(callback: types.CallbackQuery):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="👤 Базовые (Активные)", callback_data="filter_act")],
+        [InlineKeyboardButton(text="📝 На инд. плане", callback_data="filter_ind")],
+        [InlineKeyboardButton(text="💤 В академ. отпуске", callback_data="filter_acad")],
+        [InlineKeyboardButton(text="📋 Показать всех", callback_data="filter_all")]
+    ])
+    await callback.message.edit_text("Какую категорию открыть?", reply_markup=kb)
+
+@dp.callback_query(F.data.startswith("filter_"), StarostaState.main_menu)
+async def show_filtered_students(callback: types.CallbackQuery):
+    filter_type = callback.data.split("_")[1]
+    students = get_students_list()
+    statuses = load_json(STATUSES_FILE, {})
+    
+    kb = []
+    for i, student in enumerate(students):
+        stat_code = statuses.get(student, 'act')
+        if filter_type == 'all' or stat_code == filter_type:
+            emoji = "👤" if stat_code == 'act' else ("📝" if stat_code == 'ind' else "💤")
+            kb.append([InlineKeyboardButton(text=f"{emoji} {student}", callback_data=f"sel_st_{i}")])
+            
+    kb.append([InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_filters")])
+    await callback.message.edit_text("Выберите студента для изменения статуса:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+@dp.callback_query(F.data.startswith("sel_st_"), StarostaState.main_menu)
+async def select_student_status(callback: types.CallbackQuery):
+    idx = int(callback.data.split("_")[2])
+    student = get_students_list()[idx]
+    kb = [
+        [InlineKeyboardButton(text="👤 Базовый", callback_data=f"setstat_{idx}_act")],
+        [InlineKeyboardButton(text="📝 Инд. план", callback_data=f"setstat_{idx}_ind")],
+        [InlineKeyboardButton(text="💤 Академ", callback_data=f"setstat_{idx}_acad")],
+        [InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_filters")]
+    ]
+    await callback.message.edit_text(f"Статус для:\n**{student}**", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb), parse_mode="Markdown")
+
+@dp.callback_query(F.data.startswith("setstat_"), StarostaState.main_menu)
+async def save_student_status(callback: types.CallbackQuery):
+    parts = callback.data.split("_")
+    student = get_students_list()[int(parts[1])]
+    new_stat = parts[2]
+    
+    statuses = load_json(STATUSES_FILE, {})
+    statuses[student] = new_stat
+    save_json(STATUSES_FILE, statuses)
+    
+    await callback.message.edit_text(f"✅ Статус изменен!", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_filters")]]))
+
+async def main():
+    print("Бот запущен...")
+    await dp.start_polling(bot)
+
+if __name__ == "__main__":
+    asyncio.run(main())
